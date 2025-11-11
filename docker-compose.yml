@@ -1,0 +1,27 @@
+# docker-compose.yml - For local development and testing
+version: '3.8'
+
+services:
+  tourist-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - TTS_PROVIDER=edge
+      - DEFAULT_LANG=en
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-1.5-flash
+    volumes:
+      # Mount local directories for development
+      - ./app:/app/app
+      - ./audio_files:/app/audio_files
+      - ./tts_cache:/app/tts_cache
+    restart: unless-stopped
+    networks:
+      - tourist-network
+
+networks:
+  tourist-network:
+    driver: bridge

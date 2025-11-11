@@ -45,11 +45,15 @@ class LookupResponse(BaseModel):
 class TTSRequest(BaseModel):
     text: str
     lang: Optional[str] = None
+    translate: Optional[bool] = Field(True, description="Whether to translate text to target language before TTS")
 
 
 class TTSResponse(BaseModel):
     audio_url: str
     filename: str
+    original_text: str
+    translated_text: Optional[str] = None
+    language_used: str
 
 
 app = FastAPI(title="Tourist API (backend only)")
@@ -160,23 +164,69 @@ async def lookup(req: LookupRequest = Body(...)) -> LookupResponse:
 
 @app.post("/api/tts", response_model=TTSResponse)
 async def tts_api(req: TTSRequest = Body(...)) -> TTSResponse:
+    """
+    Enhanced TTS endpoint that can translate text before synthesis
+    
+    Parameters:
+    - text: The text to convert to speech
+    - lang: Target language for speech (and optionally translation)
+    - translate: Whether to translate the text to target language first (default: True)
+    """
     language = (req.lang or settings.DEFAULT_LANG).lower()
     if language not in SUPPORTED_LANGS:
         language = "en"
+    
+    # Store original text
+    original_text = req.text.strip()
+    text_for_tts = original_text
+    translated_text = None
+    
+    # If translation is enabled and target language is not English
+    if req.translate and language != "en":
+        try:
+            # Detect if the input text might be in English
+            # (Simple heuristic - you could use a language detection library for better accuracy)
+            common_english_words = ["the", "is", "are", "have", "has", "with", "from", "that", "this", "will", "can", "for"]
+            text_lower = original_text.lower()
+            is_likely_english = any(word in text_lower.split() for word in common_english_words)
+            
+            if is_likely_english:
+                # Translate from English to target language
+                import logging
+                logger = logging.getLogger("app.main")
+                logger.info(f"Translating text from English to {language}")
+                
+                # Use your genai module to translate
+                translated_text = await genai.translate_text(original_text, language)
+                if translated_text:
+                    text_for_tts = translated_text
+                    logger.info(f"Translation successful: '{original_text[:50]}...' -> '{translated_text[:50]}...'")
+                else:
+                    logger.warning(f"Translation failed, using original text")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger("app.main")
+            logger.error(f"Translation error: {e}")
+            # If translation fails, continue with original text
 
+    # Generate TTS with the (possibly translated) text
     try:
-        audio, mime = await tts.synthesize(req.text.strip(), language, provider="gtts")
+        audio, mime = await tts.synthesize(text_for_tts, language, provider=settings.TTS_PROVIDER or "edge")
     except RuntimeError as err:
-        raise HTTPException(status_code=400, detail=str(err))
+        # If primary provider fails, try with fallback
+        try:
+            audio, mime = await tts.synthesize(text_for_tts, language, provider="edge")
+        except:
+            raise HTTPException(status_code=400, detail=str(err))
 
     if not audio:
-        raise HTTPException(status_code=400, detail="gTTS synthesis failed.")
+        raise HTTPException(status_code=400, detail="TTS synthesis failed.")
 
     # Generate unique filename
-    text_hash = hashlib.md5(req.text.encode()).hexdigest()[:8]
+    text_hash = hashlib.md5(text_for_tts.encode()).hexdigest()[:8]
     timestamp = str(int(time.time()))
     file_extension = "mp3" if "mpeg" in mime else "wav"
-    random_id = str(random.randint(1002, 9999))  # Add random component
+    random_id = str(random.randint(1002, 9999))
     filename = f"tts_{language}_{text_hash}_{timestamp}_{random_id}.{file_extension}"
     file_path = os.path.join(AUDIO_DIR, filename)
 
@@ -184,9 +234,15 @@ async def tts_api(req: TTSRequest = Body(...)) -> TTSResponse:
     with open(file_path, "wb") as f:
         f.write(audio)
 
-    # Return file URL
+    # Return file URL with additional information
     audio_url = f"/audio/{filename}"
-    return TTSResponse(audio_url=audio_url, filename=filename)
+    return TTSResponse(
+        audio_url=audio_url,
+        filename=filename,
+        original_text=original_text,
+        translated_text=translated_text,
+        language_used=language
+    )
 
 
 @app.get("/api/audio/{filename}")

@@ -1,0 +1,43 @@
+# docker-compose.production.yml - For AWS production deployment
+version: '3.8'
+
+services:
+  tourist-api:
+    image: tourist-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    ports:
+      - "80:8001"  # Map to port 80 for production
+    environment:
+      - TTS_PROVIDER=edge
+      - DEFAULT_LANG=en
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-1.5-flash
+      # Production optimizations
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      # Use named volumes for persistence in production
+      - audio_data:/app/audio_files
+      - tts_cache_data:/app/tts_cache
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+volumes:
+  audio_data:
+    driver: local
+  tts_cache_data:
+    driver: local
