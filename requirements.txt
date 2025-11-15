@@ -1,28 +1,21 @@
 # FastAPI and server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+fastapi
+uvicorn[standard]
+python-multipart
 
 # Core dependencies
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
+pydantic
+pydantic-settings
+python-dotenv
 
 # HTTP and async
-httpx==0.25.1
-aiohttp==3.9.1
-aiofiles==23.2.1
+httpx
+aiohttp
+aiofiles
 
-# Google Gemini AI
-google-generativeai==0.3.0
 
-# TTS Providers
-edge-tts==6.1.9        # Microsoft Edge TTS (primary, free, reliable)
-gtts==2.4.0           # Google TTS (backup, has rate limits)
-pyttsx3==2.90         # Offline TTS (fallback)
 
-# Wikipedia API
-wikipedia-api==0.6.0
+# TTS Provider    
+elevenlabs       # ElevenLabs premium/high-quality voices (requires API key)
 
-# Optional for production
-gunicorn==21.2.0      # Alternative to uvicorn for production
+

@@ -1,15 +1,8 @@
-FROM python:3.9-slim
+FROM python:3.12-slim
 
-# Install system dependencies for TTS and audio processing
+# Minimal system deps (curl for healthcheck)
 RUN apt-get update && apt-get install -y \
-    # Required for pyttsx3 (offline TTS)
-    espeak \
-    libespeak1 \
-    # Required for audio processing
-    ffmpeg \
-    # Useful for debugging
     curl \
-    # Clean up to reduce image size
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -17,21 +10,21 @@ WORKDIR /app
 # Copy requirements first for better Docker cache utilization
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt && \
-    # Install additional TTS providers
-    pip install --no-cache-dir edge-tts pyttsx3 aiohttp
+# Install Python dependencies (single layer for cache efficiency)
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . /app
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/audio_files /app/tts_cache && \
-    chmod 755 /app/audio_files /app/tts_cache
+RUN mkdir -p /app/audio_files && \
+    chmod 755 /app/audio_files 
 
-# Set environment variables for production
-ENV PYTHONUNBUFFERED=1
-ENV TTS_PROVIDER=edge
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONSAFEPATH=1
+    # ELEVENLABS_API_KEY must be provided at runtime (compose/env)
 
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

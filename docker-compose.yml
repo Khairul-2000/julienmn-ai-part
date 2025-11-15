@@ -9,7 +9,8 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - TTS_PROVIDER=edge
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      # Optional overrides
       - DEFAULT_LANG=en
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=gemini-1.5-flash
@@ -17,7 +18,6 @@ services:
       # Mount local directories for development
       - ./app:/app/app
       - ./audio_files:/app/audio_files
-      - ./tts_cache:/app/tts_cache
     restart: unless-stopped
     networks:
       - tourist-network
